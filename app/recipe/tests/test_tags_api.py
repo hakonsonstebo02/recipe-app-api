@@ -1,3 +1,4 @@
+from genericpath import exists
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.test import TestCase
@@ -63,3 +64,16 @@ class PrivateTagsApiTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.data[0]['name'], tag.name)
+
+    def test_create_tags_sucessfull(self):
+        """Test creating a new tag"""
+        data = {'name': 'test tag'}
+        self.client.post(TAGS_URL, data)
+        exists = Tag.objects.filter(user=self.user, name=data['name']).exists()
+        self.assertTrue(exists)
+
+    def test_create_tag_invalid(self):
+        """Test creating a new tag with invalid data"""
+        data = {'name': ''}
+        response = self.client.post(TAGS_URL, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
