@@ -1,4 +1,5 @@
-from genericpath import exists
+from recipe.serializers import IngredientSerializer
+from core.models import Ingredient
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.test import TestCase
@@ -23,57 +24,60 @@ class PublicTagsApiTests(TestCase):
     def test_login_required(self):
         """Test that login required for retrieving tags"""
         res = self.client.get(TAGS_URL)
-
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-class PrivateTagsApiTests(TestCase):
-    """Test the authorized user tags API"""
+INGREDIENTS_URL = reverse('recipe:ingredient-list')
+
+
+class PublicIngredientsApiTests(TestCase):
+    """Test the publically available ingredients API"""
 
     def setUp(self):
+        self.client = APIClient()
+
+    def test_login_required(self):
+        """Test that login is required to access this endpoint"""
+        res = self.client.get(INGREDIENTS_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PrivateIngredientsAPITests(TestCase):
+    """Test ingredients can be retrieved by authorized user"""
+
+    def setUp(self):
+        self.client = APIClient()
         self.user = get_user_model().objects.create_user(
             'test@londonappdev.com',
-            'password'
+            'testpass'
         )
-        self.client = APIClient()
         self.client.force_authenticate(self.user)
 
-    def test_retrieve_tags(self):
-        """Test retrieving tags"""
-        Tag.objects.create(user=self.user, name='Vegan')
-        Tag.objects.create(user=self.user, name='Dessert')
+    def test_retrieve_ingredient_list(self):
+        """Test retrieving a list of ingredients"""
+        Ingredient.objects.create(user=self.user, name='kale')
+        Ingredient.objects.create(user=self.user, name='Salt')
 
-        res = self.client.get(TAGS_URL)
+        res = self.client.get(INGREDIENTS_URL)
 
-        tags = Tag.objects.all().order_by('-name')
-        serializer = TagSerializer(tags, many=True)
+        ingredients = Ingredient.objects.all().order_by('-name')
+        serializer = IngredientSerializer(ingredients, many=True)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data, serializer.data)
 
-    def test_tags_limited_to_user(self):
-        """Test that tags returned are for authenticated user"""
+    def test_ingredients_limited_to_user(self):
+        """Test that only ingredients for authenticated user are returned"""
         user2 = get_user_model().objects.create_user(
             'other@londonappdev.com',
             'testpass'
         )
-        Tag.objects.create(user=user2, name='Fruity')
-        tag = Tag.objects.create(user=self.user, name='Comfort Food')
+        Ingredient.objects.create(user=user2, name='Vinegar')
 
-        res = self.client.get(TAGS_URL)
+        ingredient = Ingredient.objects.create(user=self.user, name='Tumeric')
+
+        res = self.client.get(INGREDIENTS_URL)
 
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(len(res.data), 1)
-        self.assertEqual(res.data[0]['name'], tag.name)
-
-    def test_create_tags_sucessfull(self):
-        """Test creating a new tag"""
-        data = {'name': 'test tag'}
-        self.client.post(TAGS_URL, data)
-        exists = Tag.objects.filter(user=self.user, name=data['name']).exists()
-        self.assertTrue(exists)
-
-    def test_create_tag_invalid(self):
-        """Test creating a new tag with invalid data"""
-        data = {'name': ''}
-        response = self.client.post(TAGS_URL, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.data[0]['name'], ingredient.name)
