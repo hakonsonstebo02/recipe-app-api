@@ -40,3 +40,10 @@ class RecipeSerializer(serializers.ModelSerializer):
         )
         # Prevent updating id when they make edit or create requests
         read_only_fields = ('id',)
+
+
+class RecipeDetailSerializer(RecipeSerializer):
+    """Serialize a recipe detail"""
+
+    ingredients = IngredientSerializer(many=True, read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
