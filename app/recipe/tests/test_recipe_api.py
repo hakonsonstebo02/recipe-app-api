@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, tag
 from django.urls import reverse
 
+
 from core.models import Recipe, Tag, Ingredient
 from recipe.serializers import RecipeSerializer, RecipeDetailSerializer
 
@@ -142,3 +143,49 @@ class PrivateRecipeTest(TestCase):
         self.assertEqual(ingredients.count(), 2)
         self.assertIn(ingredient1, ingredients)
         self.assertIn(ingredient2, ingredients)
+
+    def test_partial_update_recipe(self):
+        """test updating a recipe with patch"""
+
+        # Path updates the fields provided in data
+        # Put updates all the fields
+
+        recipe = sample_recipe(user=self.user)
+        recipe.tags.add(sample_tag(user=self.user))
+        new_tag = sample_tag(user=self.user, name='curry')
+
+        payload = {
+            'title': 'Chicken tikka',
+            'tags': [new_tag.id],
+        }
+        url = detail_url(recipe.id)
+
+        self.client.patch(url, payload)
+
+        recipe.refresh_from_db()
+
+        self.assertEqual(recipe.title, payload['title'])
+        tags = recipe.tags.all()
+        self.assertEqual(len(tags), 1)
+        self.assertIn(new_tag, tags)
+
+    def test_full_update_recipe(self):
+        recipe = sample_recipe(user=self.user)
+        recipe.tags.add(sample_tag(user=self.user))
+        data = {
+            'title': 'spaghetti',
+            'time_minutes': 25,
+            'price': 5.00,
+        }
+        url = detail_url(recipe.id)
+        # Put updates all the fields
+        response = self.client.put(url, data)
+
+        recipe.refresh_from_db()
+
+        self.assertEqual(recipe.title, data['title'])
+        self.assertEqual(recipe.time_minutes, data['time_minutes'])
+        self.assertEqual(recipe.price, data['price'])
+
+        tags = recipe.tags.all()
+        self.assertEqual(len(tags), 0)
